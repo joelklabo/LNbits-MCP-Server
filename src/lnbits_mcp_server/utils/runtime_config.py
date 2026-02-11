@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Callable, Optional, Dict
 from threading import RLock
 from contextlib import asynccontextmanager
 
@@ -15,17 +15,14 @@ logger = logging.getLogger(__name__)
 
 class RuntimeConfigManager:
     """Manages runtime configuration for the LNbits MCP server."""
-    
+
     def __init__(self, initial_config: Optional[LNbitsConfig] = None):
-        """Initialize the runtime configuration manager.
-        
-        Args:
-            initial_config: Initial configuration, defaults to environment-based config
-        """
         self._config = initial_config or LNbitsConfig()
         self._client: Optional[LNbitsClient] = None
         self._lock = RLock()
         self._is_configured = False
+        # Async callback invoked after configuration changes (e.g. re-discover tools)
+        self.on_config_changed: Optional[Any] = None
         
     @property
     def config(self) -> LNbitsConfig:
@@ -74,13 +71,9 @@ class RuntimeConfigManager:
             ValidationError: If configuration is invalid
         """
         with self._lock:
-            # Store original config for rollback
             original_config = self._config.model_copy()
-            
             try:
-                # Build new config dict
                 config_dict = self._config.model_dump()
-                
                 if lnbits_url is not None:
                     config_dict["lnbits_url"] = lnbits_url
                 if api_key is not None:
@@ -95,38 +88,40 @@ class RuntimeConfigManager:
                     config_dict["timeout"] = timeout
                 if rate_limit_per_minute is not None:
                     config_dict["rate_limit_per_minute"] = rate_limit_per_minute
-                
-                # Validate new configuration
+
                 new_config = LNbitsConfig(**config_dict)
-                
-                # Close existing client if it exists
+
                 if self._client:
                     if hasattr(self._client, 'close'):
                         await self._client.close()
                     self._client = None
-                
-                # Update configuration
+
                 self._config = new_config
                 self._is_configured = True
-                
                 logger.info(f"Configuration updated successfully: {new_config.lnbits_url}")
-                
-                return {
+
+                result = {
                     "success": True,
                     "message": "Configuration updated successfully",
                     "config": self._get_safe_config_dict()
                 }
-                
             except ValidationError as e:
-                # Rollback on validation error
                 self._config = original_config
                 logger.error(f"Configuration validation failed: {e}")
                 raise
             except Exception as e:
-                # Rollback on any other error
                 self._config = original_config
                 logger.error(f"Configuration update failed: {e}")
                 raise
+
+        # Fire callback outside the lock
+        if self.on_config_changed is not None:
+            try:
+                await self.on_config_changed()
+            except Exception as exc:
+                logger.warning(f"on_config_changed callback failed: {exc}")
+
+        return result
     
     async def test_configuration(self) -> Dict[str, Any]:
         """Test the current configuration by making a test API call.
@@ -136,31 +131,16 @@ class RuntimeConfigManager:
         """
         try:
             client = await self.get_client()
-            
-            # Test connection by getting wallet info
-            wallet_info = await client.get_wallet_details()
-            
-            # Handle dict response (wallet_info is a dict, not an object)
-            if isinstance(wallet_info, dict):
-                return {
-                    "success": True,
-                    "message": "Configuration test successful",
-                    "wallet_info": {
-                        "id": wallet_info.get("id", "N/A"),
-                        "name": wallet_info.get("name", "N/A"),
-                        "balance": wallet_info.get("balance", 0)
-                    }
+            wallet_info = await client.get("/api/v1/wallet")
+            return {
+                "success": True,
+                "message": "Configuration test successful",
+                "wallet_info": {
+                    "id": wallet_info.get("id", "N/A"),
+                    "name": wallet_info.get("name", "N/A"),
+                    "balance": wallet_info.get("balance", 0),
                 }
-            else:
-                return {
-                    "success": True,
-                    "message": "Configuration test successful",
-                    "wallet_info": {
-                        "id": getattr(wallet_info, 'id', 'N/A'),
-                        "name": getattr(wallet_info, 'name', 'N/A'),
-                        "balance": getattr(wallet_info, 'balance_msat', 0)
-                    }
-                }
+            }
             
         except Exception as e:
             logger.error(f"Configuration test failed: {e}")
