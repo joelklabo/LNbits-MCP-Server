@@ -57,6 +57,10 @@ META_TOOL_DEFINITIONS: list[Tool] = [
                     "minimum": 1,
                     "maximum": 1000,
                 },
+                "access_token": {
+                    "type": "string",
+                    "description": "JWT access token for user-level endpoints",
+                },
             },
         },
     ),

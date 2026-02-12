@@ -96,3 +96,49 @@ class TestToolRegistry:
         assert reg.last_refresh == 0.0
         reg.load(operations)
         assert reg.last_refresh > 0
+
+    def test_usr_hidden_from_schema(self):
+        """usr param should be hidden since it's auto-injected."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="GET",
+            path="/api/v1/wallets",
+            summary="List wallets",
+            description="List wallets",
+            tag="core",
+            parameters=[
+                {"name": "usr", "in": "query", "required": True, "schema": {"type": "string"}},
+                {"name": "limit", "in": "query", "schema": {"type": "integer"}},
+            ],
+            request_body_schema=None,
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        assert "usr" not in schema["properties"]
+        assert "limit" in schema["properties"]
+        # usr should not appear in required either
+        assert "usr" not in schema.get("required", [])
+
+    def test_cookie_param_hidden_from_schema(self):
+        """Cookie params like cookie_access_token should be hidden."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="GET",
+            path="/api/v1/auth",
+            summary="Auth",
+            description="Auth",
+            tag="auth",
+            parameters=[
+                {"name": "cookie_access_token", "in": "cookie", "schema": {"type": "string"}},
+                {"name": "limit", "in": "query", "schema": {"type": "integer"}},
+            ],
+            request_body_schema=None,
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        assert "cookie_access_token" not in schema["properties"]
+        assert "limit" in schema["properties"]

@@ -16,17 +16,27 @@ logger = structlog.get_logger(__name__)
 class Dispatcher:
     """Execute any DiscoveredOperation against the LNbits API."""
 
+    # Parameter names that signal user-level auth is needed
+    _USER_AUTH_PARAMS = {"usr", "cookie_access_token"}
+
     async def dispatch(
         self,
         client: LNbitsClient,
         op: DiscoveredOperation,
         arguments: dict[str, Any],
+        *,
+        access_token: str | None = None,
     ) -> str:
         """Build the HTTP request from *op* + *arguments* and return the
         JSON response body as a string (LLMs handle JSON well)."""
 
         path = self._substitute_path_params(op.path, arguments)
         query_params, body = self._separate_params(op, arguments)
+
+        # Auto-inject Bearer token for endpoints that need user-level auth
+        extra_headers: dict[str, str] = {}
+        if access_token and self._needs_user_auth(op):
+            extra_headers["Authorization"] = f"Bearer {access_token}"
 
         logger.info(
             "Dispatching",
@@ -40,6 +50,7 @@ class Dispatcher:
             path=path,
             params=query_params or None,
             json=body or None,
+            headers=extra_headers or None,
         )
 
         return json.dumps(result, indent=2, default=str)
@@ -47,6 +58,14 @@ class Dispatcher:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @classmethod
+    def _needs_user_auth(cls, op: DiscoveredOperation) -> bool:
+        """Return True if the operation declares user-level auth parameters."""
+        for p in op.parameters:
+            if p.get("name") in cls._USER_AUTH_PARAMS:
+                return True
+        return False
 
     @staticmethod
     def _substitute_path_params(

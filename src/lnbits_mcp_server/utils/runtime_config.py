@@ -52,6 +52,7 @@ class RuntimeConfigManager:
         auth_method: Optional[str] = None,
         timeout: Optional[int] = None,
         rate_limit_per_minute: Optional[int] = None,
+        access_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update the runtime configuration.
         
@@ -88,6 +89,8 @@ class RuntimeConfigManager:
                     config_dict["timeout"] = timeout
                 if rate_limit_per_minute is not None:
                     config_dict["rate_limit_per_minute"] = rate_limit_per_minute
+                if access_token is not None:
+                    config_dict["access_token"] = access_token
 
                 new_config = LNbitsConfig(**config_dict)
 
@@ -193,7 +196,9 @@ class RuntimeConfigManager:
             config_dict["bearer_token"] = "***MASKED***"
         if config_dict.get("oauth2_token"):
             config_dict["oauth2_token"] = "***MASKED***"
-            
+        if config_dict.get("access_token"):
+            config_dict["access_token"] = "***MASKED***"
+
         return config_dict
     
     async def close(self):

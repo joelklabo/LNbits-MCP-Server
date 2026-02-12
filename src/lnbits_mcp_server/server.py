@@ -111,7 +111,10 @@ class LNbitsMCPServer:
                     )]
 
                 client = await self.config_manager.get_client()
-                text = await self.dispatcher.dispatch(client, op, arguments)
+                text = await self.dispatcher.dispatch(
+                    client, op, arguments,
+                    access_token=self.config_manager.config.access_token,
+                )
                 return [types.TextContent(type="text", text=text)]
 
             except LNbitsError as e:

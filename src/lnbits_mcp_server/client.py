@@ -23,6 +23,7 @@ class LNbitsConfig(BaseSettings):
 
     lnbits_url: HttpUrl = Field(
         default="https://demo.lnbits.com",
+        validation_alias="LNBITS_URL",
         description="Base URL for LNbits instance",
     )
     api_key: Optional[str] = Field(
@@ -34,6 +35,10 @@ class LNbitsConfig(BaseSettings):
     oauth2_token: Optional[str] = Field(
         default=None, description="OAuth2 token for authentication"
     )
+    access_token: Optional[str] = Field(
+        default=None,
+        description="JWT access token for user-level endpoints (admin users)",
+    )
     auth_method: AuthMethod = Field(
         default=AuthMethod.API_KEY_HEADER, description="Authentication method to use"
     )
@@ -43,7 +48,11 @@ class LNbitsConfig(BaseSettings):
     )
     rate_limit_per_minute: int = Field(default=60, description="Rate limit per minute")
 
-    model_config = {"env_prefix": "LNBITS_", "case_sensitive": False}
+    model_config = {
+        "env_prefix": "LNBITS_",
+        "case_sensitive": False,
+        "populate_by_name": True,
+    }
 
 
 class LNbitsError(Exception):

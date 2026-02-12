@@ -19,9 +19,11 @@ CURATED_DESCRIPTIONS: dict[str, str] = {
         "List recent payments. Each entry includes payment_hash, amount (msats), "
         "memo, and status."
     ),
-    "payments_create_payment": (
+    "payments_create_payments": (
         "Create an invoice (out=false) or pay a BOLT11 invoice (out=true). "
-        "Amount is in sats when unit='sat'."
+        "Amount is in sats when unit='sat'. "
+        "IMPORTANT: 'out' must be a boolean (not string), 'amount' must be a "
+        "number (not string)."
     ),
     "payments_get_payment": "Get the status of a specific payment by its hash.",
     "payments_decode_payment": (

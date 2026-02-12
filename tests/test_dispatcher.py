@@ -108,7 +108,8 @@ class TestDispatch:
         op = _make_op(method="GET", path="/api/v1/wallet")
         result = await dispatcher.dispatch(mock_client, op, {})
         mock_client._request.assert_called_once_with(
-            method="GET", path="/api/v1/wallet", params=None, json=None
+            method="GET", path="/api/v1/wallet", params=None, json=None,
+            headers=None,
         )
         parsed = json.loads(result)
         assert parsed == {"status": "ok"}
@@ -128,6 +129,7 @@ class TestDispatch:
             path="/api/v1/payments",
             params=None,
             json={"amount": 100, "memo": "test"},
+            headers=None,
         )
 
     @pytest.mark.asyncio
@@ -147,6 +149,7 @@ class TestDispatch:
             path="/api/v1/payments/abc123",
             params=None,
             json=None,
+            headers=None,
         )
 
     @pytest.mark.asyncio
@@ -156,3 +159,85 @@ class TestDispatch:
         op = _make_op(method="GET", path="/api/v1/wallet")
         with pytest.raises(LNbitsError):
             await dispatcher.dispatch(mock_client, op, {})
+
+
+class TestAccessTokenInjection:
+    """Regression tests for auto-injecting Bearer token on user-level endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_token_injected_when_op_has_usr_param(self, dispatcher, mock_client):
+        op = _make_op(
+            method="GET",
+            path="/api/v1/wallets",
+            parameters=[
+                {"name": "usr", "in": "query", "schema": {"type": "string"}},
+                {"name": "cookie_access_token", "in": "cookie", "schema": {"type": "string"}},
+            ],
+        )
+        await dispatcher.dispatch(
+            mock_client, op, {}, access_token="my-jwt-token"
+        )
+        mock_client._request.assert_called_once_with(
+            method="GET",
+            path="/api/v1/wallets",
+            params=None,
+            json=None,
+            headers={"Authorization": "Bearer my-jwt-token"},
+        )
+
+    @pytest.mark.asyncio
+    async def test_token_not_injected_when_op_has_no_user_params(self, dispatcher, mock_client):
+        op = _make_op(
+            method="GET",
+            path="/api/v1/wallet",
+            parameters=[],
+        )
+        await dispatcher.dispatch(
+            mock_client, op, {}, access_token="my-jwt-token"
+        )
+        mock_client._request.assert_called_once_with(
+            method="GET",
+            path="/api/v1/wallet",
+            params=None,
+            json=None,
+            headers=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_token_not_injected_when_access_token_is_none(self, dispatcher, mock_client):
+        op = _make_op(
+            method="GET",
+            path="/api/v1/wallets",
+            parameters=[
+                {"name": "usr", "in": "query", "schema": {"type": "string"}},
+            ],
+        )
+        await dispatcher.dispatch(mock_client, op, {}, access_token=None)
+        mock_client._request.assert_called_once_with(
+            method="GET",
+            path="/api/v1/wallets",
+            params=None,
+            json=None,
+            headers=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_token_injected_for_cookie_access_token_param(self, dispatcher, mock_client):
+        op = _make_op(
+            method="GET",
+            path="/api/v1/wallet/paginated",
+            parameters=[
+                {"name": "cookie_access_token", "in": "cookie", "schema": {"type": "string"}},
+                {"name": "limit", "in": "query", "schema": {"type": "integer"}},
+            ],
+        )
+        await dispatcher.dispatch(
+            mock_client, op, {"limit": 10}, access_token="my-jwt-token"
+        )
+        mock_client._request.assert_called_once_with(
+            method="GET",
+            path="/api/v1/wallet/paginated",
+            params={"limit": 10},
+            json=None,
+            headers={"Authorization": "Bearer my-jwt-token"},
+        )

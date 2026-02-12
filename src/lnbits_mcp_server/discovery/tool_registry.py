@@ -116,9 +116,16 @@ class ToolRegistry:
         properties: dict[str, Any] = {}
         required: list[str] = []
 
+        # Names to hide from tool schemas (auto-injected or irrelevant)
+        hidden_params = {"usr", "cookie_access_token"}
+
         # Path + query parameters
         for param in op.parameters:
             name = param.get("name", "")
+            if name in hidden_params:
+                continue
+            if param.get("in") == "cookie":
+                continue
             schema = param.get("schema", {"type": "string"})
             # Clean schema for MCP (remove title, default handling)
             prop: dict[str, Any] = {}
