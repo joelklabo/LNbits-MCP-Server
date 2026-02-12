@@ -82,3 +82,108 @@ class TestEndToEnd:
         """Discovered tool names should never shadow meta tool names."""
         for name in registry.tool_names:
             assert name not in META_TOOL_NAMES, f"Collision: {name}"
+
+    @pytest.mark.asyncio
+    async def test_invoice_creation_includes_qr_code(self, registry):
+        """Creating an invoice should enrich response with qr_code and lightning_uri."""
+        dispatcher = Dispatcher()
+        mock_client = AsyncMock()
+        mock_client._request = AsyncMock(
+            return_value={"payment_hash": "abc123", "payment_request": "lnbc1234..."}
+        )
+        mock_client.config = LNbitsConfig(lnbits_url="http://localhost:5000")
+
+        payments_op = None
+        for name, op in registry._operations.items():
+            if op.path == "/api/v1/payments" and op.method == "POST":
+                payments_op = op
+                break
+
+        assert payments_op is not None
+        result = await dispatcher.dispatch(
+            mock_client, payments_op, {"amount": 100, "out": False}
+        )
+        parsed = json.loads(result)
+        assert "qrcode" in parsed["qr_code"]
+        assert parsed["lightning_uri"].startswith("lightning:")
+
+    @pytest.mark.asyncio
+    async def test_outgoing_payment_no_qr_code(self, registry):
+        """Outgoing payments should not include qr_code or lightning_uri."""
+        dispatcher = Dispatcher()
+        mock_client = AsyncMock()
+        mock_client._request = AsyncMock(
+            return_value={"payment_hash": "abc123", "checking_id": "xyz"}
+        )
+        mock_client.config = LNbitsConfig(lnbits_url="http://localhost:5000")
+
+        payments_op = None
+        for name, op in registry._operations.items():
+            if op.path == "/api/v1/payments" and op.method == "POST":
+                payments_op = op
+                break
+
+        assert payments_op is not None
+        result = await dispatcher.dispatch(
+            mock_client, payments_op, {"amount": 100, "out": True, "bolt11": "lnbc..."}
+        )
+        parsed = json.loads(result)
+        assert "qr_code" not in parsed
+        assert "lightning_uri" not in parsed
+
+    @pytest.mark.asyncio
+    async def test_access_token_injected_on_user_level_endpoint(self, registry):
+        """Dispatching to an endpoint with usr param should inject Bearer token."""
+        dispatcher = Dispatcher()
+        mock_client = AsyncMock()
+        mock_client._request = AsyncMock(return_value=[{"id": "w1"}])
+        mock_client.config = LNbitsConfig(lnbits_url="http://localhost:5000")
+
+        wallets_op = None
+        for name, op in registry._operations.items():
+            if op.path == "/api/v1/wallets" and op.method == "GET":
+                wallets_op = op
+                break
+
+        assert wallets_op is not None
+        await dispatcher.dispatch(
+            mock_client, wallets_op, {}, access_token="test-jwt-token-123"
+        )
+        mock_client._request.assert_called_once()
+        call_kwargs = mock_client._request.call_args
+        assert call_kwargs.kwargs.get("headers") == {
+            "Authorization": "Bearer test-jwt-token-123"
+        }
+
+    @pytest.mark.asyncio
+    async def test_configure_lnbits_roundtrip(self, config_manager):
+        """configure_lnbits then get_configuration should reflect changes."""
+        meta = MetaTools(config_manager)
+        meta.set_callbacks(
+            refresh_fn=AsyncMock(return_value=5),
+            get_extensions_fn=lambda: {},
+        )
+
+        result = await meta.call_tool(
+            "configure_lnbits",
+            {"lnbits_url": "http://newhost:5000", "api_key": "newkey123"},
+        )
+        parsed = json.loads(result)
+        assert parsed["success"] is True
+
+        result = await meta.call_tool("get_configuration", {})
+        parsed = json.loads(result)
+        assert "newhost" in parsed["config"]["lnbits_url"]
+        assert parsed["config"]["api_key"] == "***MASKED***"
+
+    def test_curated_description_for_payments(self, registry):
+        """payments_create_payments should have a curated description mentioning qr_code."""
+        tools = registry.get_mcp_tools()
+        payments_tool = None
+        for t in tools:
+            if t.name == "payments_create_payments":
+                payments_tool = t
+                break
+
+        assert payments_tool is not None
+        assert "qr_code" in payments_tool.description

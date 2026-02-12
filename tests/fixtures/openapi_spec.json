@@ -36,6 +36,19 @@
         "security": [{ "APIKeyHeader": [] }]
       }
     },
+    "/api/v1/wallets": {
+      "get": {
+        "tags": ["Wallet"],
+        "summary": "Api Wallets",
+        "operationId": "api_wallets_api_v1_wallets_get",
+        "parameters": [
+          {"name": "usr", "in": "query", "required": false, "schema": {"type": "string"}},
+          {"name": "cookie_access_token", "in": "cookie", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "OK"}},
+        "security": [{"APIKeyHeader": []}]
+      }
+    },
     "/api/v1/wallet/{new_name}": {
       "put": {
         "tags": ["Wallet"],
