@@ -143,9 +143,7 @@ class MetaTools:
     def get_tools() -> list[Tool]:
         return list(META_TOOL_DEFINITIONS)
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> str:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
         """Dispatch a meta tool call. Returns a text string."""
         if name == "configure_lnbits":
             return await self._configure(arguments)
@@ -179,21 +177,26 @@ class MetaTools:
         if self._refresh_fn is None:
             return json.dumps({"error": "Refresh callback not set"})
         count = await self._refresh_fn()
-        return json.dumps({
-            "success": True,
-            "message": f"Refreshed tool list — {count} tools discovered",
-            "tool_count": count,
-        })
+        return json.dumps(
+            {
+                "success": True,
+                "message": f"Refreshed tool list — {count} tools discovered",
+                "tool_count": count,
+            }
+        )
 
     def _list_extensions(self) -> str:
         if self._get_extensions_fn is None:
             return json.dumps({"error": "Extension query callback not set"})
         extensions = self._get_extensions_fn()
-        return json.dumps({
-            "extensions": extensions,
-            "total_extensions": len(extensions),
-            "total_tools": sum(extensions.values()),
-        }, indent=2)
+        return json.dumps(
+            {
+                "extensions": extensions,
+                "total_extensions": len(extensions),
+                "total_tools": sum(extensions.values()),
+            },
+            indent=2,
+        )
 
     async def _pay_lightning_address(self, arguments: dict[str, Any]) -> str:
         address = arguments["lightning_address"]

@@ -3,7 +3,10 @@
 import pytest
 from mcp.types import Tool
 
-from lnbits_mcp_server.discovery.openapi_parser import DiscoveredOperation, OpenAPIParser
+from lnbits_mcp_server.discovery.openapi_parser import (
+    DiscoveredOperation,
+    OpenAPIParser,
+)
 from lnbits_mcp_server.discovery.tool_registry import RegistryConfig, ToolRegistry
 
 
@@ -50,9 +53,7 @@ class TestToolRegistry:
         reg.load(operations)
         exts = reg.get_extensions()
         assert "lnurlp" in exts
-        assert "core" in exts or any(
-            v > 0 for k, v in exts.items() if k != "lnurlp"
-        )
+        assert "core" in exts or any(v > 0 for k, v in exts.items() if k != "lnurlp")
 
     def test_include_extensions_filter(self, operations):
         reg = ToolRegistry(RegistryConfig(include_extensions=["lnurlp"]))
@@ -62,7 +63,9 @@ class TestToolRegistry:
                 assert op.extension_name == "lnurlp"
 
     def test_exclude_extensions_filter(self, operations):
-        reg = ToolRegistry(RegistryConfig(exclude_extensions=["lnurlp"], exclude_methods=[]))
+        reg = ToolRegistry(
+            RegistryConfig(exclude_extensions=["lnurlp"], exclude_methods=[])
+        )
         reg.load(operations)
         for op in reg._operations.values():
             assert op.extension_name != "lnurlp"
@@ -85,7 +88,10 @@ class TestToolRegistry:
         tools = reg.get_mcp_tools()
         tool_map = {t.name: t for t in tools}
         # Check if any curated description was applied
-        from lnbits_mcp_server.discovery.curated_descriptions import CURATED_DESCRIPTIONS
+        from lnbits_mcp_server.discovery.curated_descriptions import (
+            CURATED_DESCRIPTIONS,
+        )
+
         for name, desc in CURATED_DESCRIPTIONS.items():
             if name in tool_map:
                 assert tool_map[name].description == desc
@@ -107,7 +113,12 @@ class TestToolRegistry:
             description="List wallets",
             tag="core",
             parameters=[
-                {"name": "usr", "in": "query", "required": True, "schema": {"type": "string"}},
+                {
+                    "name": "usr",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string"},
+                },
                 {"name": "limit", "in": "query", "schema": {"type": "integer"}},
             ],
             request_body_schema=None,
@@ -131,7 +142,11 @@ class TestToolRegistry:
             description="Auth",
             tag="auth",
             parameters=[
-                {"name": "cookie_access_token", "in": "cookie", "schema": {"type": "string"}},
+                {
+                    "name": "cookie_access_token",
+                    "in": "cookie",
+                    "schema": {"type": "string"},
+                },
                 {"name": "limit", "in": "query", "schema": {"type": "integer"}},
             ],
             request_body_schema=None,

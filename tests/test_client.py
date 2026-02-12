@@ -6,7 +6,6 @@ import pytest
 from lnbits_mcp_server.client import LNbitsClient, LNbitsConfig, LNbitsError
 from lnbits_mcp_server.utils.auth import AuthMethod
 
-
 # ---------------------------------------------------------------------------
 # LNbitsConfig
 # ---------------------------------------------------------------------------

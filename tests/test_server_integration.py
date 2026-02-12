@@ -5,13 +5,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lnbits_mcp_server.discovery.meta_tools import META_TOOL_NAMES
+from lnbits_mcp_server.client import LNbitsConfig
+from lnbits_mcp_server.discovery.dispatcher import Dispatcher
+from lnbits_mcp_server.discovery.meta_tools import META_TOOL_NAMES, MetaTools
 from lnbits_mcp_server.discovery.openapi_parser import OpenAPIParser
 from lnbits_mcp_server.discovery.tool_registry import ToolRegistry
-from lnbits_mcp_server.discovery.dispatcher import Dispatcher
-from lnbits_mcp_server.discovery.meta_tools import MetaTools
 from lnbits_mcp_server.utils.runtime_config import RuntimeConfigManager
-from lnbits_mcp_server.client import LNbitsConfig
 
 
 @pytest.fixture
@@ -52,7 +51,9 @@ class TestEndToEnd:
         """Simulate calling a discovered tool via the dispatcher."""
         dispatcher = Dispatcher()
         mock_client = AsyncMock()
-        mock_client._request = AsyncMock(return_value={"id": "wallet1", "balance": 5000})
+        mock_client._request = AsyncMock(
+            return_value={"id": "wallet1", "balance": 5000}
+        )
 
         # Find the wallet GET tool
         wallet_tool = None

@@ -208,11 +208,15 @@ class LNbitsClient:
         amount_msats = amount_sats * 1000
         callback_url = await self.resolve_lightning_address(lightning_address)
         if not callback_url:
-            raise LNbitsError(f"Failed to resolve lightning address: {lightning_address}")
+            raise LNbitsError(
+                f"Failed to resolve lightning address: {lightning_address}"
+            )
         invoice = await self.get_lnurl_pay_invoice(callback_url, amount_msats, comment)
         if not invoice:
             raise LNbitsError(f"Failed to get invoice for: {lightning_address}")
-        return await self.post("/api/v1/payments", json={"out": True, "bolt11": invoice})
+        return await self.post(
+            "/api/v1/payments", json={"out": True, "bolt11": invoice}
+        )
 
     async def check_connection(self) -> bool:
         try:

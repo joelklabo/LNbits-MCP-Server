@@ -2,13 +2,14 @@
 
 import asyncio
 import logging
-from typing import Any, Callable, Optional, Dict
-from threading import RLock
 from contextlib import asynccontextmanager
+from threading import RLock
+from typing import Any, Callable, Dict, Optional
+
+from pydantic import HttpUrl, ValidationError
 
 from ..client import LNbitsClient, LNbitsConfig
 from ..utils.auth import AuthMethod
-from pydantic import HttpUrl, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -23,26 +24,26 @@ class RuntimeConfigManager:
         self._is_configured = False
         # Async callback invoked after configuration changes (e.g. re-discover tools)
         self.on_config_changed: Optional[Any] = None
-        
+
     @property
     def config(self) -> LNbitsConfig:
         """Get current configuration."""
         with self._lock:
             return self._config
-    
+
     @property
     def is_configured(self) -> bool:
         """Check if configuration has been set through runtime tools."""
         with self._lock:
             return self._is_configured
-    
+
     async def get_client(self) -> LNbitsClient:
         """Get the current LNbits client, creating one if necessary."""
         with self._lock:
             if not self._client:
                 self._client = LNbitsClient(self._config)
             return self._client
-    
+
     async def update_configuration(
         self,
         lnbits_url: Optional[str] = None,
@@ -55,7 +56,7 @@ class RuntimeConfigManager:
         access_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update the runtime configuration.
-        
+
         Args:
             lnbits_url: Base URL for LNbits instance
             api_key: API key for authentication
@@ -64,10 +65,10 @@ class RuntimeConfigManager:
             auth_method: Authentication method to use
             timeout: Request timeout in seconds
             rate_limit_per_minute: Rate limit per minute
-            
+
         Returns:
             Dictionary with update results
-            
+
         Raises:
             ValidationError: If configuration is invalid
         """
@@ -95,18 +96,20 @@ class RuntimeConfigManager:
                 new_config = LNbitsConfig(**config_dict)
 
                 if self._client:
-                    if hasattr(self._client, 'close'):
+                    if hasattr(self._client, "close"):
                         await self._client.close()
                     self._client = None
 
                 self._config = new_config
                 self._is_configured = True
-                logger.info(f"Configuration updated successfully: {new_config.lnbits_url}")
+                logger.info(
+                    f"Configuration updated successfully: {new_config.lnbits_url}"
+                )
 
                 result = {
                     "success": True,
                     "message": "Configuration updated successfully",
-                    "config": self._get_safe_config_dict()
+                    "config": self._get_safe_config_dict(),
                 }
             except ValidationError as e:
                 self._config = original_config
@@ -125,10 +128,10 @@ class RuntimeConfigManager:
                 logger.warning(f"on_config_changed callback failed: {exc}")
 
         return result
-    
+
     async def test_configuration(self) -> Dict[str, Any]:
         """Test the current configuration by making a test API call.
-        
+
         Returns:
             Dictionary with test results
         """
@@ -142,13 +145,13 @@ class RuntimeConfigManager:
                     "id": wallet_info.get("id", "N/A"),
                     "name": wallet_info.get("name", "N/A"),
                     "balance": wallet_info.get("balance", 0),
-                }
+                },
             }
-            
+
         except Exception as e:
             logger.error(f"Configuration test failed: {e}")
             error_message = str(e)
-            
+
             # Provide better error messages for common issues
             if "404" in error_message and "Wallet not found" in error_message:
                 error_message = (
@@ -162,33 +165,33 @@ class RuntimeConfigManager:
                     "6. Make sure the API key is from the correct wallet\n\n"
                     "If using demo.lnbits.com, you need to create a wallet first by visiting the website."
                 )
-            
+
             return {
                 "success": False,
                 "message": f"Configuration test failed: {error_message}",
-                "error": str(e)
+                "error": str(e),
             }
-    
+
     def get_configuration_status(self) -> Dict[str, Any]:
         """Get the current configuration status.
-        
+
         Returns:
             Dictionary with configuration status
         """
         with self._lock:
             return {
                 "is_configured": self._is_configured,
-                "config": self._get_safe_config_dict()
+                "config": self._get_safe_config_dict(),
             }
-    
+
     def _get_safe_config_dict(self) -> Dict[str, Any]:
         """Get configuration dictionary with sensitive data masked."""
         config_dict = self._config.model_dump()
-        
+
         # Convert HttpUrl to string for JSON serialization
         if "lnbits_url" in config_dict:
             config_dict["lnbits_url"] = str(config_dict["lnbits_url"])
-        
+
         # Mask sensitive fields
         if config_dict.get("api_key"):
             config_dict["api_key"] = "***MASKED***"
@@ -200,15 +203,15 @@ class RuntimeConfigManager:
             config_dict["access_token"] = "***MASKED***"
 
         return config_dict
-    
+
     async def close(self):
         """Close the configuration manager and cleanup resources."""
         with self._lock:
             if self._client:
-                if hasattr(self._client, 'close'):
+                if hasattr(self._client, "close"):
                     await self._client.close()
                 self._client = None
-    
+
     @asynccontextmanager
     async def get_client_context(self):
         """Context manager for getting a client with proper cleanup."""

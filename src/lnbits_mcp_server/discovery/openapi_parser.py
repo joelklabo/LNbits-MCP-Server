@@ -85,12 +85,8 @@ class OpenAPIParser:
                 tag = (op.get("tags") or ["other"])[0]
                 summary = op.get("summary", "")
                 description = op.get("description", summary)
-                parameters = self._resolve_parameters(
-                    op.get("parameters", []), schemas
-                )
-                body_schema = self._resolve_request_body(
-                    op.get("requestBody"), schemas
-                )
+                parameters = self._resolve_parameters(op.get("parameters", []), schemas)
+                body_schema = self._resolve_request_body(op.get("requestBody"), schemas)
                 security = self._extract_security(op.get("security", []))
                 is_public = len(security) == 0
                 extension = self._detect_extension(path)
@@ -204,9 +200,7 @@ class OpenAPIParser:
             }
         # Resolve items in arrays
         if "items" in result:
-            result["items"] = self._resolve_schema(
-                result["items"], schemas, _depth + 1
-            )
+            result["items"] = self._resolve_schema(result["items"], schemas, _depth + 1)
         # Resolve allOf / anyOf / oneOf
         for combo_key in ("allOf", "anyOf", "oneOf"):
             if combo_key in result:

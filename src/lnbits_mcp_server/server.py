@@ -70,7 +70,9 @@ class LNbitsMCPServer:
 
             return count
         except Exception as e:
-            logger.warning("Tool discovery failed — serving meta tools only", error=str(e))
+            logger.warning(
+                "Tool discovery failed — serving meta tools only", error=str(e)
+            )
             return 0
 
     async def _on_config_changed(self) -> None:
@@ -93,7 +95,9 @@ class LNbitsMCPServer:
             return tools
 
         @self.server.call_tool()
-        async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextContent]:
+        async def call_tool(
+            name: str, arguments: Dict[str, Any]
+        ) -> list[types.TextContent]:
             try:
                 logger.info("call_tool", tool=name)
 
@@ -105,30 +109,38 @@ class LNbitsMCPServer:
                 # Discovered tools
                 op = self.registry.get(name)
                 if op is None:
-                    return [types.TextContent(
-                        type="text",
-                        text=f"Unknown tool: {name}",
-                    )]
+                    return [
+                        types.TextContent(
+                            type="text",
+                            text=f"Unknown tool: {name}",
+                        )
+                    ]
 
                 client = await self.config_manager.get_client()
                 text = await self.dispatcher.dispatch(
-                    client, op, arguments,
+                    client,
+                    op,
+                    arguments,
                     access_token=self.config_manager.config.access_token,
                 )
                 return [types.TextContent(type="text", text=text)]
 
             except LNbitsError as e:
                 logger.error("LNbits API error", error=str(e), tool=name)
-                return [types.TextContent(
-                    type="text",
-                    text=f"LNbits API error: {e}",
-                )]
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"LNbits API error: {e}",
+                    )
+                ]
             except Exception as e:
                 logger.error("Unexpected error", error=str(e), tool=name, exc_info=True)
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: {e}",
-                )]
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"Error: {e}",
+                    )
+                ]
 
     # ------------------------------------------------------------------
     # Run

@@ -54,9 +54,7 @@ class ToolRegistry:
             self._operations[op.tool_name] = op
             accepted += 1
             if accepted >= self.config.max_tools:
-                logger.warning(
-                    "Max tools reached", max_tools=self.config.max_tools
-                )
+                logger.warning("Max tools reached", max_tools=self.config.max_tools)
                 break
 
         self.last_refresh = time.time()
@@ -98,7 +96,9 @@ class ToolRegistry:
         return tools
 
     def _to_mcp_tool(self, op: DiscoveredOperation) -> Tool:
-        description = CURATED_DESCRIPTIONS.get(op.tool_name, op.summary or op.description)
+        description = CURATED_DESCRIPTIONS.get(
+            op.tool_name, op.summary or op.description
+        )
         input_schema = self._build_input_schema(op)
         return Tool(
             name=op.tool_name,

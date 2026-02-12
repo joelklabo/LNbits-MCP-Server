@@ -107,7 +107,5 @@ class TestBuildToolName:
         assert "payments" in name
 
     def test_extension_path(self):
-        name = OpenAPIParser._build_tool_name(
-            "lnurlp", "get", "/lnurlp/api/v1/links"
-        )
+        name = OpenAPIParser._build_tool_name("lnurlp", "get", "/lnurlp/api/v1/links")
         assert name == "lnurlp_list_links"

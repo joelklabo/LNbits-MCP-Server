@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from lnbits_mcp_server.discovery.meta_tools import MetaTools, META_TOOL_NAMES
+from lnbits_mcp_server.discovery.meta_tools import META_TOOL_NAMES, MetaTools
 
 
 @pytest.fixture
@@ -18,7 +18,10 @@ def config_manager():
         return_value={"success": True, "message": "Connected"}
     )
     mgr.get_configuration_status = MagicMock(
-        return_value={"is_configured": True, "config": {"lnbits_url": "http://localhost"}}
+        return_value={
+            "is_configured": True,
+            "config": {"lnbits_url": "http://localhost"},
+        }
     )
     return mgr
 

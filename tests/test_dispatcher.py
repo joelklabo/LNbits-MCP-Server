@@ -70,9 +70,7 @@ class TestParamSeparation:
                 {"name": "offset", "in": "query", "schema": {"type": "integer"}},
             ]
         )
-        query, body = Dispatcher._separate_params(
-            op, {"limit": 10, "offset": 5}
-        )
+        query, body = Dispatcher._separate_params(op, {"limit": 10, "offset": 5})
         assert query == {"limit": 10, "offset": 5}
         assert body == {}
 
@@ -83,9 +81,7 @@ class TestParamSeparation:
                 {"name": "payment_hash", "in": "path", "schema": {"type": "string"}},
             ],
         )
-        query, body = Dispatcher._separate_params(
-            op, {"payment_hash": "abc123"}
-        )
+        query, body = Dispatcher._separate_params(op, {"payment_hash": "abc123"})
         assert query == {}
         assert body == {}  # path params are excluded
 
@@ -108,7 +104,10 @@ class TestDispatch:
         op = _make_op(method="GET", path="/api/v1/wallet")
         result = await dispatcher.dispatch(mock_client, op, {})
         mock_client._request.assert_called_once_with(
-            method="GET", path="/api/v1/wallet", params=None, json=None,
+            method="GET",
+            path="/api/v1/wallet",
+            params=None,
+            json=None,
             headers=None,
         )
         parsed = json.loads(result)
@@ -141,9 +140,7 @@ class TestDispatch:
                 {"name": "payment_hash", "in": "path", "schema": {"type": "string"}},
             ],
         )
-        result = await dispatcher.dispatch(
-            mock_client, op, {"payment_hash": "abc123"}
-        )
+        result = await dispatcher.dispatch(mock_client, op, {"payment_hash": "abc123"})
         mock_client._request.assert_called_once_with(
             method="GET",
             path="/api/v1/payments/abc123",
@@ -155,6 +152,7 @@ class TestDispatch:
     @pytest.mark.asyncio
     async def test_error_propagation(self, dispatcher, mock_client):
         from lnbits_mcp_server.client import LNbitsError
+
         mock_client._request.side_effect = LNbitsError("Not found", 404)
         op = _make_op(method="GET", path="/api/v1/wallet")
         with pytest.raises(LNbitsError):
@@ -171,12 +169,14 @@ class TestAccessTokenInjection:
             path="/api/v1/wallets",
             parameters=[
                 {"name": "usr", "in": "query", "schema": {"type": "string"}},
-                {"name": "cookie_access_token", "in": "cookie", "schema": {"type": "string"}},
+                {
+                    "name": "cookie_access_token",
+                    "in": "cookie",
+                    "schema": {"type": "string"},
+                },
             ],
         )
-        await dispatcher.dispatch(
-            mock_client, op, {}, access_token="my-jwt-token"
-        )
+        await dispatcher.dispatch(mock_client, op, {}, access_token="my-jwt-token")
         mock_client._request.assert_called_once_with(
             method="GET",
             path="/api/v1/wallets",
@@ -186,15 +186,15 @@ class TestAccessTokenInjection:
         )
 
     @pytest.mark.asyncio
-    async def test_token_not_injected_when_op_has_no_user_params(self, dispatcher, mock_client):
+    async def test_token_not_injected_when_op_has_no_user_params(
+        self, dispatcher, mock_client
+    ):
         op = _make_op(
             method="GET",
             path="/api/v1/wallet",
             parameters=[],
         )
-        await dispatcher.dispatch(
-            mock_client, op, {}, access_token="my-jwt-token"
-        )
+        await dispatcher.dispatch(mock_client, op, {}, access_token="my-jwt-token")
         mock_client._request.assert_called_once_with(
             method="GET",
             path="/api/v1/wallet",
@@ -204,7 +204,9 @@ class TestAccessTokenInjection:
         )
 
     @pytest.mark.asyncio
-    async def test_token_not_injected_when_access_token_is_none(self, dispatcher, mock_client):
+    async def test_token_not_injected_when_access_token_is_none(
+        self, dispatcher, mock_client
+    ):
         op = _make_op(
             method="GET",
             path="/api/v1/wallets",
@@ -222,12 +224,18 @@ class TestAccessTokenInjection:
         )
 
     @pytest.mark.asyncio
-    async def test_token_injected_for_cookie_access_token_param(self, dispatcher, mock_client):
+    async def test_token_injected_for_cookie_access_token_param(
+        self, dispatcher, mock_client
+    ):
         op = _make_op(
             method="GET",
             path="/api/v1/wallet/paginated",
             parameters=[
-                {"name": "cookie_access_token", "in": "cookie", "schema": {"type": "string"}},
+                {
+                    "name": "cookie_access_token",
+                    "in": "cookie",
+                    "schema": {"type": "string"},
+                },
                 {"name": "limit", "in": "query", "schema": {"type": "integer"}},
             ],
         )
@@ -261,7 +269,10 @@ class TestInvoiceEnrichment:
             "payment_request": "lnbc100n1p0abcdef",
         }
         enriched = Dispatcher._enrich_invoice(result, op, {"out": False}, client)
-        assert enriched["qr_code"] == "https://lnbits.example.com/api/v1/qrcode/lnbc100n1p0abcdef"
+        assert (
+            enriched["qr_code"]
+            == "https://lnbits.example.com/api/v1/qrcode/lnbc100n1p0abcdef"
+        )
         assert enriched["lightning_uri"] == "lightning:lnbc100n1p0abcdef"
 
     def test_outgoing_payment_not_enriched(self):
@@ -284,7 +295,10 @@ class TestInvoiceEnrichment:
         op = _make_op(tool_name="payments_create_payments")
         result = {"payment_hash": "abc123", "bolt11": "lnbc200n1p0xyz"}
         enriched = Dispatcher._enrich_invoice(result, op, {}, client)
-        assert enriched["qr_code"] == "https://lnbits.example.com/api/v1/qrcode/lnbc200n1p0xyz"
+        assert (
+            enriched["qr_code"]
+            == "https://lnbits.example.com/api/v1/qrcode/lnbc200n1p0xyz"
+        )
         assert enriched["lightning_uri"] == "lightning:lnbc200n1p0xyz"
 
     def test_trailing_slash_url_handled(self):
@@ -292,4 +306,7 @@ class TestInvoiceEnrichment:
         op = _make_op(tool_name="payments_create_payments")
         result = {"payment_request": "lnbc100n1p0abcdef"}
         enriched = Dispatcher._enrich_invoice(result, op, {}, client)
-        assert enriched["qr_code"] == "https://lnbits.example.com/api/v1/qrcode/lnbc100n1p0abcdef"
+        assert (
+            enriched["qr_code"]
+            == "https://lnbits.example.com/api/v1/qrcode/lnbc100n1p0abcdef"
+        )

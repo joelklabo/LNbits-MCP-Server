@@ -100,9 +100,7 @@ class Dispatcher:
         return False
 
     @staticmethod
-    def _substitute_path_params(
-        path_template: str, arguments: dict[str, Any]
-    ) -> str:
+    def _substitute_path_params(path_template: str, arguments: dict[str, Any]) -> str:
         """Replace ``{param}`` placeholders in the URL with actual values."""
         import re
 
