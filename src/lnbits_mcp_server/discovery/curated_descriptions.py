@@ -22,6 +22,8 @@ CURATED_DESCRIPTIONS: dict[str, str] = {
     "payments_create_payments": (
         "Create an invoice (out=false) or pay a BOLT11 invoice (out=true). "
         "Amount is in sats when unit='sat'. "
+        "When creating an invoice, the response includes qr_code (URL to a "
+        "scannable QR code image) and lightning_uri — display both to the user. "
         "IMPORTANT: 'out' must be a boolean (not string), 'amount' must be a "
         "number (not string)."
     ),

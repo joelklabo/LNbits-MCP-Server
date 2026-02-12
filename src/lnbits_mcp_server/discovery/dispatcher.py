@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import quote, urljoin
 
 import structlog
 
@@ -53,7 +54,38 @@ class Dispatcher:
             headers=extra_headers or None,
         )
 
+        result = self._enrich_invoice(result, op, arguments, client)
+
         return json.dumps(result, indent=2, default=str)
+
+    # ------------------------------------------------------------------
+    # Post-processing
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _enrich_invoice(
+        result: Any,
+        op: DiscoveredOperation,
+        arguments: dict[str, Any],
+        client: LNbitsClient,
+    ) -> Any:
+        """Add QR code URL and lightning URI to invoice creation responses."""
+        if op.tool_name != "payments_create_payments":
+            return result
+        # Only enrich invoice creation (out=false), not outgoing payments
+        if arguments.get("out", False):
+            return result
+        if not isinstance(result, dict):
+            return result
+
+        bolt11 = result.get("payment_request") or result.get("bolt11")
+        if not bolt11:
+            return result
+
+        base_url = str(client.config.lnbits_url).rstrip("/")
+        result["qr_code"] = f"{base_url}/api/v1/qrcode/{quote(bolt11, safe='')}"
+        result["lightning_uri"] = f"lightning:{bolt11}"
+        return result
 
     # ------------------------------------------------------------------
     # Helpers

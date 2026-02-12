@@ -1,7 +1,7 @@
 """Tests for discovery.dispatcher."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
@@ -241,3 +241,55 @@ class TestAccessTokenInjection:
             json=None,
             headers={"Authorization": "Bearer my-jwt-token"},
         )
+
+
+class TestInvoiceEnrichment:
+    """Tests for QR code and lightning URI enrichment on invoice creation."""
+
+    def _mock_client_with_url(self, url="https://lnbits.example.com"):
+        client = AsyncMock()
+        config = MagicMock()
+        config.lnbits_url = url
+        client.config = config
+        return client
+
+    def test_invoice_response_gets_qr_code_and_lightning_uri(self):
+        client = self._mock_client_with_url()
+        op = _make_op(tool_name="payments_create_payments")
+        result = {
+            "payment_hash": "abc123",
+            "payment_request": "lnbc100n1p0abcdef",
+        }
+        enriched = Dispatcher._enrich_invoice(result, op, {"out": False}, client)
+        assert enriched["qr_code"] == "https://lnbits.example.com/api/v1/qrcode/lnbc100n1p0abcdef"
+        assert enriched["lightning_uri"] == "lightning:lnbc100n1p0abcdef"
+
+    def test_outgoing_payment_not_enriched(self):
+        client = self._mock_client_with_url()
+        op = _make_op(tool_name="payments_create_payments")
+        result = {"payment_hash": "abc123", "payment_request": "lnbc100n1p0abcdef"}
+        enriched = Dispatcher._enrich_invoice(result, op, {"out": True}, client)
+        assert "qr_code" not in enriched
+        assert "lightning_uri" not in enriched
+
+    def test_non_payment_op_not_enriched(self):
+        client = self._mock_client_with_url()
+        op = _make_op(tool_name="wallet_get_wallet")
+        result = {"id": "wallet1", "balance": 1000}
+        enriched = Dispatcher._enrich_invoice(result, op, {}, client)
+        assert "qr_code" not in enriched
+
+    def test_uses_bolt11_field_as_fallback(self):
+        client = self._mock_client_with_url()
+        op = _make_op(tool_name="payments_create_payments")
+        result = {"payment_hash": "abc123", "bolt11": "lnbc200n1p0xyz"}
+        enriched = Dispatcher._enrich_invoice(result, op, {}, client)
+        assert enriched["qr_code"] == "https://lnbits.example.com/api/v1/qrcode/lnbc200n1p0xyz"
+        assert enriched["lightning_uri"] == "lightning:lnbc200n1p0xyz"
+
+    def test_trailing_slash_url_handled(self):
+        client = self._mock_client_with_url("https://lnbits.example.com/")
+        op = _make_op(tool_name="payments_create_payments")
+        result = {"payment_request": "lnbc100n1p0abcdef"}
+        enriched = Dispatcher._enrich_invoice(result, op, {}, client)
+        assert enriched["qr_code"] == "https://lnbits.example.com/api/v1/qrcode/lnbc100n1p0abcdef"
