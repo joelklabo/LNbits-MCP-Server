@@ -241,7 +241,8 @@ class ToolRegistry:
             "properties": properties,
         }
         if required:
-            result["required"] = required
+            # Deduplicate while preserving order (path + body params can overlap)
+            result["required"] = list(dict.fromkeys(required))
         return result
 
     @classmethod

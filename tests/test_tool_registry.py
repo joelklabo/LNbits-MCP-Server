@@ -538,6 +538,39 @@ class TestToolRegistry:
         assert items["type"] == "string"
         assert items["enum"] == ["view", "send", "receive"]
 
+    def test_required_deduplicated(self):
+        """required array must not have duplicates (path + body can overlap)."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="PUT",
+            path="/api/v1/extensions/{ext_id}/install",
+            summary="Install",
+            description="Install",
+            tag="extensions",
+            parameters=[
+                {
+                    "name": "ext_id",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                },
+            ],
+            request_body_schema={
+                "properties": {
+                    "ext_id": {"type": "string"},
+                    "archive": {"type": "string"},
+                },
+                "required": ["ext_id", "archive"],
+            },
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        assert schema["required"] == ["ext_id", "archive"]
+        # No duplicates
+        assert len(schema["required"]) == len(set(schema["required"]))
+
     def test_title_to_description_fallback(self):
         """_extract_prop should convert title to description when no description."""
         schema = {"type": "string", "title": "My Title"}
@@ -663,3 +696,31 @@ class TestToolRegistryLiveSpec:
             assert not issues, (
                 f"Tool '{tool.name}' has whole-number float constraints: {issues}"
             )
+
+    def test_no_duplicate_required_in_live_spec(self, live_operations):
+        """required arrays must have unique items (JSON Schema 2020-12)."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(live_operations)
+        tools = reg.get_mcp_tools()
+
+        for tool in tools:
+            req = tool.inputSchema.get("required", [])
+            assert len(req) == len(set(req)), (
+                f"Tool '{tool.name}' has duplicate required entries: {req}"
+            )
+
+    def test_schemas_valid_against_2020_12_metaschema(self, live_operations):
+        """Every tool inputSchema must pass JSON Schema 2020-12 validation."""
+        from jsonschema import Draft202012Validator
+
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(live_operations)
+        tools = reg.get_mcp_tools()
+
+        for tool in tools:
+            try:
+                Draft202012Validator.check_schema(tool.inputSchema)
+            except Exception as e:
+                raise AssertionError(
+                    f"Tool '{tool.name}' has invalid JSON Schema 2020-12: {e}"
+                )
