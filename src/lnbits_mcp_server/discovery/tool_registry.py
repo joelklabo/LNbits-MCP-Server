@@ -138,12 +138,25 @@ class ToolRegistry:
         "$ref",
     }
 
+    # Numeric keywords where float values like 1.0 should be coerced to int.
+    _NUMERIC_KEYWORDS: set[str] = {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "minItems",
+        "maxItems",
+        "minLength",
+        "maxLength",
+    }
+
     @classmethod
     def _sanitize_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
         """Recursively strip OpenAPI-only keywords from a schema dict.
 
         Also converts ``nullable: true`` into a JSON Schema ``anyOf`` with
-        ``{"type": "null"}``.
+        ``{"type": "null"}``, and coerces whole-number floats (e.g. ``1.0``)
+        to ``int`` in numeric constraint keywords.
         """
         result: dict[str, Any] = {}
 
@@ -167,6 +180,8 @@ class ToolRegistry:
                 ]
             elif key == "additionalProperties" and isinstance(value, dict):
                 result[key] = cls._sanitize_schema(value)
+            elif key in cls._NUMERIC_KEYWORDS and isinstance(value, float):
+                result[key] = int(value) if value == int(value) else value
             else:
                 result[key] = value
 

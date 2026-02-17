@@ -388,6 +388,70 @@ class TestToolRegistry:
         schema = {"example": "foo", "deprecated": True, "xml": {"name": "x"}}
         assert ToolRegistry._sanitize_schema(schema) == {}
 
+    def test_float_minimum_coerced_to_int(self):
+        """Whole-number float values like 1.0 in minimum/maximum must become int."""
+        schema = {
+            "type": "integer",
+            "minimum": 1.0,
+            "maximum": 100.0,
+            "description": "Amount",
+        }
+        result = ToolRegistry._sanitize_schema(schema)
+        assert result["minimum"] == 1
+        assert isinstance(result["minimum"], int)
+        assert result["maximum"] == 100
+        assert isinstance(result["maximum"], int)
+
+    def test_float_minimum_non_whole_preserved(self):
+        """Non-whole float values like 0.01 in minimum should stay as float."""
+        schema = {"type": "number", "minimum": 0.01}
+        result = ToolRegistry._sanitize_schema(schema)
+        assert result["minimum"] == 0.01
+        assert isinstance(result["minimum"], float)
+
+    def test_float_coercion_in_nested_items(self):
+        """Float coercion must work recursively in items."""
+        schema = {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 0.0, "maximum": 6.0},
+        }
+        result = ToolRegistry._sanitize_schema(schema)
+        assert result["items"]["minimum"] == 0
+        assert isinstance(result["items"]["minimum"], int)
+        assert result["items"]["maximum"] == 6
+        assert isinstance(result["items"]["maximum"], int)
+
+    def test_no_float_minimums_in_any_tool_schema(self, operations):
+        """No tool schema should contain float values for numeric constraints."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(operations)
+        tools = reg.get_mcp_tools()
+
+        numeric_keys = {"minimum", "maximum", "exclusiveMinimum",
+                        "exclusiveMaximum", "minItems", "maxItems",
+                        "minLength", "maxLength"}
+
+        def check_floats(obj, path, issues):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k in numeric_keys and isinstance(v, float):
+                        issues.append(f"{k}={v} at {path}.{k}")
+                    if k == "properties" and isinstance(v, dict):
+                        for pn, pv in v.items():
+                            check_floats(pv, f"{path}.properties.{pn}", issues)
+                    elif k == "items" and isinstance(v, dict):
+                        check_floats(v, f"{path}.items", issues)
+                    elif k in ("anyOf", "oneOf", "allOf") and isinstance(v, list):
+                        for j, s in enumerate(v):
+                            check_floats(s, f"{path}.{k}[{j}]", issues)
+
+        for tool in tools:
+            issues = []
+            check_floats(tool.inputSchema, "root", issues)
+            assert not issues, (
+                f"Tool '{tool.name}' has float numeric constraints: {issues}"
+            )
+
     def test_title_to_description_fallback(self):
         """_extract_prop should convert title to description when no description."""
         schema = {"type": "string", "title": "My Title"}

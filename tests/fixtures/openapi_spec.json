@@ -221,6 +221,17 @@
             },
             "name": "tags",
             "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1.0,
+              "maximum": 100.0,
+              "description": "Amount filter"
+            },
+            "name": "amount",
+            "in": "query"
           }
         ],
         "responses": {
