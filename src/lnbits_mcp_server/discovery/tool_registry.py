@@ -107,11 +107,82 @@ class ToolRegistry:
         )
 
     # ------------------------------------------------------------------
+    # Schema sanitization
+    # ------------------------------------------------------------------
+
+    # JSON Schema keywords allowed in draft 2020-12 input schemas.
+    _ALLOWED_KEYWORDS: set[str] = {
+        "type",
+        "properties",
+        "required",
+        "items",
+        "enum",
+        "anyOf",
+        "oneOf",
+        "allOf",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "pattern",
+        "format",
+        "description",
+        "default",
+        "additionalProperties",
+        "minItems",
+        "maxItems",
+        "minLength",
+        "maxLength",
+        "const",
+        "prefixItems",
+        "$ref",
+    }
+
+    @classmethod
+    def _sanitize_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
+        """Recursively strip OpenAPI-only keywords from a schema dict.
+
+        Also converts ``nullable: true`` into a JSON Schema ``anyOf`` with
+        ``{"type": "null"}``.
+        """
+        result: dict[str, Any] = {}
+
+        # Handle nullable → anyOf conversion
+        is_nullable = schema.get("nullable", False)
+
+        for key, value in schema.items():
+            if key not in cls._ALLOWED_KEYWORDS:
+                continue
+            if key == "properties" and isinstance(value, dict):
+                result["properties"] = {
+                    k: cls._sanitize_schema(v) if isinstance(v, dict) else v
+                    for k, v in value.items()
+                }
+            elif key == "items" and isinstance(value, dict):
+                result["items"] = cls._sanitize_schema(value)
+            elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
+                result[key] = [
+                    cls._sanitize_schema(v) if isinstance(v, dict) else v
+                    for v in value
+                ]
+            elif key == "additionalProperties" and isinstance(value, dict):
+                result[key] = cls._sanitize_schema(value)
+            else:
+                result[key] = value
+
+        # Convert nullable to anyOf
+        if is_nullable and "type" in result:
+            original_type = result.pop("type")
+            result["anyOf"] = [{"type": original_type}, {"type": "null"}]
+
+        return result
+
+    # ------------------------------------------------------------------
     # Input schema builder
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _build_input_schema(op: DiscoveredOperation) -> dict[str, Any]:
+    @classmethod
+    def _build_input_schema(cls, op: DiscoveredOperation) -> dict[str, Any]:
         """Build a JSON Schema ``inputSchema`` from path/query params + body."""
         properties: dict[str, Any] = {}
         required: list[str] = []
@@ -127,21 +198,7 @@ class ToolRegistry:
             if param.get("in") == "cookie":
                 continue
             schema = param.get("schema", {"type": "string"})
-            # Clean schema for MCP (remove title, default handling)
-            prop: dict[str, Any] = {}
-            if "type" in schema:
-                prop["type"] = schema["type"]
-            if "enum" in schema:
-                prop["enum"] = schema["enum"]
-            if "description" in schema:
-                prop["description"] = schema["description"]
-            elif "title" in schema:
-                prop["description"] = schema["title"]
-            if "default" in schema:
-                prop["default"] = schema["default"]
-            if "items" in schema:
-                prop["items"] = schema["items"]
-
+            prop = cls._extract_prop(schema)
             properties[name] = prop
             if param.get("required", False):
                 required.append(name)
@@ -152,23 +209,7 @@ class ToolRegistry:
             body_props = body.get("properties", {})
             body_required = body.get("required", [])
             for prop_name, prop_schema in body_props.items():
-                prop: dict[str, Any] = {}
-                if "type" in prop_schema:
-                    prop["type"] = prop_schema["type"]
-                if "enum" in prop_schema:
-                    prop["enum"] = prop_schema["enum"]
-                if "description" in prop_schema:
-                    prop["description"] = prop_schema["description"]
-                elif "title" in prop_schema:
-                    prop["description"] = prop_schema["title"]
-                if "default" in prop_schema:
-                    prop["default"] = prop_schema["default"]
-                if "items" in prop_schema:
-                    prop["items"] = prop_schema["items"]
-                # Fallback: if no type info at all, default to string
-                if not prop:
-                    prop = {"type": "string"}
-
+                prop = cls._extract_prop(prop_schema)
                 properties[prop_name] = prop
                 if prop_name in body_required:
                     required.append(prop_name)
@@ -179,6 +220,19 @@ class ToolRegistry:
         }
         if required:
             result["required"] = required
+        return result
+
+    @classmethod
+    def _extract_prop(cls, schema: dict[str, Any]) -> dict[str, Any]:
+        """Extract a single property schema, sanitized for JSON Schema 2020-12."""
+        # Convert OpenAPI "title" to "description" if no description exists
+        prepared = dict(schema)
+        if "description" not in prepared and "title" in prepared:
+            prepared["description"] = prepared.pop("title")
+        result = cls._sanitize_schema(prepared)
+        # Fallback: if no type info at all, default to string
+        if not result:
+            result = {"type": "string"}
         return result
 
     # ------------------------------------------------------------------

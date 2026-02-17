@@ -157,3 +157,253 @@ class TestToolRegistry:
         schema = ToolRegistry._build_input_schema(op)
         assert "cookie_access_token" not in schema["properties"]
         assert "limit" in schema["properties"]
+
+    def test_openapi_keywords_stripped_from_params(self):
+        """OpenAPI-only keywords like nullable, example, etc. must be stripped."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="GET",
+            path="/api/v1/payments",
+            summary="Get payments",
+            description="Get payments",
+            tag="payments",
+            parameters=[
+                {
+                    "name": "checking_id",
+                    "in": "query",
+                    "schema": {
+                        "type": "string",
+                        "nullable": True,
+                        "example": "abc123",
+                        "deprecated": True,
+                        "description": "The checking ID",
+                    },
+                },
+            ],
+            request_body_schema=None,
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        prop = schema["properties"]["checking_id"]
+        assert "nullable" not in prop
+        assert "example" not in prop
+        assert "deprecated" not in prop
+        assert prop["description"] == "The checking ID"
+        # nullable should be converted to anyOf
+        assert "anyOf" in prop
+        assert {"type": "null"} in prop["anyOf"]
+
+    def test_items_sanitized_recursively(self):
+        """items sub-schemas must also be sanitized."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="POST",
+            path="/api/v1/payments",
+            summary="Create payment",
+            description="Create payment",
+            tag="payments",
+            parameters=[],
+            request_body_schema={
+                "properties": {
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "example": "tag1",
+                            "nullable": True,
+                            "readOnly": True,
+                        },
+                    }
+                },
+                "required": [],
+            },
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        items = schema["properties"]["tags"]["items"]
+        assert "example" not in items
+        assert "readOnly" not in items
+        assert "nullable" not in items
+        # nullable converted to anyOf
+        assert "anyOf" in items
+
+    def test_nested_properties_sanitized(self):
+        """Deeply nested schemas must be sanitized."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="POST",
+            path="/api/v1/payments",
+            summary="Create",
+            description="Create",
+            tag="payments",
+            parameters=[],
+            request_body_schema={
+                "properties": {
+                    "extra": {
+                        "type": "object",
+                        "properties": {
+                            "inner": {
+                                "type": "string",
+                                "example": "foo",
+                                "xml": {"wrapped": True},
+                            }
+                        },
+                    }
+                },
+                "required": [],
+            },
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        inner = schema["properties"]["extra"]["properties"]["inner"]
+        assert "example" not in inner
+        assert "xml" not in inner
+        assert inner["type"] == "string"
+
+    # ------------------------------------------------------------------
+    # Integration: no OpenAPI keywords leak through any tool schema
+    # ------------------------------------------------------------------
+
+    # OpenAPI-only keywords that must never appear in MCP inputSchemas.
+    OPENAPI_ONLY_KEYWORDS = {
+        "nullable",
+        "example",
+        "examples",
+        "deprecated",
+        "readOnly",
+        "writeOnly",
+        "discriminator",
+        "xml",
+        "externalDocs",
+    }
+
+    @classmethod
+    def _collect_keys_recursive(cls, obj, collected=None):
+        """Walk a JSON-like structure and collect every dict key."""
+        if collected is None:
+            collected = set()
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                collected.add(key)
+                cls._collect_keys_recursive(value, collected)
+        elif isinstance(obj, list):
+            for item in obj:
+                cls._collect_keys_recursive(item, collected)
+        return collected
+
+    def test_no_openapi_keywords_in_any_tool_schema(self, operations):
+        """Every tool schema from the real fixture must be free of OpenAPI-only keywords."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(operations)
+        tools = reg.get_mcp_tools()
+        assert len(tools) > 0, "Expected at least one tool"
+
+        for tool in tools:
+            keys = self._collect_keys_recursive(tool.inputSchema)
+            leaked = keys & self.OPENAPI_ONLY_KEYWORDS
+            assert not leaked, (
+                f"Tool '{tool.name}' has OpenAPI-only keywords in its "
+                f"inputSchema: {leaked}"
+            )
+
+    def test_nullable_converted_to_anyof_in_fixture_tools(self, operations):
+        """Params with nullable:true in the fixture must produce anyOf with null type."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(operations)
+        tools = reg.get_mcp_tools()
+        tool_map = {t.name: t for t in tools}
+
+        # GET /api/v1/payments → payments_list_payments has checking_id with nullable
+        tool = tool_map.get("payments_list_payments")
+        assert tool is not None, "Expected payments_list_payments tool"
+        prop = tool.inputSchema["properties"]["checking_id"]
+        assert "nullable" not in prop
+        assert "anyOf" in prop
+        assert {"type": "null"} in prop["anyOf"]
+
+    # ------------------------------------------------------------------
+    # _sanitize_schema unit tests
+    # ------------------------------------------------------------------
+
+    def test_sanitize_schema_preserves_allowed_keywords(self):
+        """Allowed JSON Schema keywords must pass through."""
+        schema = {
+            "type": "string",
+            "description": "A name",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[a-z]+$",
+            "format": "email",
+            "default": "test",
+            "enum": ["a", "b"],
+        }
+        result = ToolRegistry._sanitize_schema(schema)
+        for key in schema:
+            assert key in result, f"Allowed keyword '{key}' was stripped"
+        assert result == schema
+
+    def test_sanitize_schema_strips_all_openapi_keywords(self):
+        """Every known OpenAPI-only keyword must be stripped."""
+        schema = {
+            "type": "string",
+            "nullable": True,
+            "example": "foo",
+            "examples": ["foo", "bar"],
+            "deprecated": True,
+            "readOnly": True,
+            "writeOnly": False,
+            "discriminator": {"propertyName": "type"},
+            "xml": {"name": "item"},
+            "externalDocs": {"url": "https://example.com"},
+        }
+        result = ToolRegistry._sanitize_schema(schema)
+        for kw in self.OPENAPI_ONLY_KEYWORDS:
+            assert kw not in result, f"OpenAPI keyword '{kw}' was not stripped"
+
+    def test_sanitize_schema_anyof_members_sanitized(self):
+        """anyOf/oneOf/allOf members must be recursively sanitized."""
+        schema = {
+            "anyOf": [
+                {"type": "string", "example": "foo"},
+                {"type": "integer", "deprecated": True},
+            ]
+        }
+        result = ToolRegistry._sanitize_schema(schema)
+        assert len(result["anyOf"]) == 2
+        assert result["anyOf"][0] == {"type": "string"}
+        assert result["anyOf"][1] == {"type": "integer"}
+
+    def test_sanitize_schema_empty_input(self):
+        """Empty schema should return empty dict."""
+        assert ToolRegistry._sanitize_schema({}) == {}
+
+    def test_sanitize_schema_only_forbidden_keys(self):
+        """Schema with only OpenAPI keywords should return empty dict."""
+        schema = {"example": "foo", "deprecated": True, "xml": {"name": "x"}}
+        assert ToolRegistry._sanitize_schema(schema) == {}
+
+    def test_title_to_description_fallback(self):
+        """_extract_prop should convert title to description when no description."""
+        schema = {"type": "string", "title": "My Title"}
+        result = ToolRegistry._extract_prop(schema)
+        assert result["description"] == "My Title"
+        assert "title" not in result
+
+    def test_title_not_override_description(self):
+        """_extract_prop should keep description when both title and description exist."""
+        schema = {"type": "string", "title": "Title", "description": "Desc"}
+        result = ToolRegistry._extract_prop(schema)
+        assert result["description"] == "Desc"
+        assert "title" not in result
+
+    def test_extract_prop_empty_schema_defaults_to_string(self):
+        """_extract_prop with only forbidden keys should fall back to {type: string}."""
+        schema = {"example": "foo", "deprecated": True}
+        result = ToolRegistry._extract_prop(schema)
+        assert result == {"type": "string"}

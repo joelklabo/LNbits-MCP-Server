@@ -7,15 +7,27 @@
   "paths": {
     "/api/v1/wallet": {
       "get": {
-        "tags": ["Wallet"],
+        "tags": [
+          "Wallet"
+        ],
         "summary": "Api Wallet",
         "operationId": "api_wallet_api_v1_wallet_get",
         "parameters": [],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       },
       "post": {
-        "tags": ["Wallet"],
+        "tags": [
+          "Wallet"
+        ],
         "summary": "Create Wallet",
         "operationId": "create_wallet_api_v1_wallet_post",
         "requestBody": {
@@ -24,83 +36,208 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string", "title": "Wallet Name" }
+                  "name": {
+                    "type": "string",
+                    "title": "Wallet Name"
+                  }
                 },
-                "required": ["name"]
+                "required": [
+                  "name"
+                ]
               }
             }
           },
           "required": true
         },
-        "responses": { "201": { "description": "Created" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/wallets": {
       "get": {
-        "tags": ["Wallet"],
+        "tags": [
+          "Wallet"
+        ],
         "summary": "Api Wallets",
         "operationId": "api_wallets_api_v1_wallets_get",
         "parameters": [
-          {"name": "usr", "in": "query", "required": false, "schema": {"type": "string"}},
-          {"name": "cookie_access_token", "in": "cookie", "required": false, "schema": {"type": "string"}}
+          {
+            "name": "usr",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cookie_access_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "responses": {"200": {"description": "OK"}},
-        "security": [{"APIKeyHeader": []}]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/wallet/{new_name}": {
       "put": {
-        "tags": ["Wallet"],
+        "tags": [
+          "Wallet"
+        ],
         "summary": "Update Wallet",
         "operationId": "update_wallet_api_v1_wallet__new_name__put",
         "parameters": [
           {
             "required": true,
-            "schema": { "type": "string", "title": "New Name" },
+            "schema": {
+              "type": "string",
+              "title": "New Name"
+            },
             "name": "new_name",
             "in": "path"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/wallet/{wallet_id}": {
       "delete": {
-        "tags": ["Wallet"],
+        "tags": [
+          "Wallet"
+        ],
         "summary": "Delete Wallet",
         "operationId": "delete_wallet_api_v1_wallet__wallet_id__delete",
         "parameters": [
           {
             "required": true,
-            "schema": { "type": "string", "title": "Wallet Id" },
+            "schema": {
+              "type": "string",
+              "title": "Wallet Id"
+            },
             "name": "wallet_id",
             "in": "path"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/payments": {
       "get": {
-        "tags": ["Payments"],
+        "tags": [
+          "Payments"
+        ],
         "summary": "Api Payments",
         "operationId": "api_payments_api_v1_payments_get",
         "parameters": [
           {
             "required": false,
-            "schema": { "type": "integer", "title": "Limit", "default": 10 },
+            "schema": {
+              "type": "integer",
+              "title": "Limit",
+              "default": 10
+            },
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "example": "abc123",
+              "deprecated": true,
+              "description": "Filter by checking ID"
+            },
+            "name": "checking_id",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "readOnly": true,
+              "writeOnly": false,
+              "externalDocs": {
+                "url": "https://example.com"
+              },
+              "xml": {
+                "name": "status"
+              },
+              "description": "Payment status"
+            },
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "example": "tag1",
+                "nullable": true,
+                "discriminator": {
+                  "propertyName": "kind"
+                }
+              },
+              "description": "Filter tags"
+            },
+            "name": "tags",
             "in": "query"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       },
       "post": {
-        "tags": ["Payments"],
+        "tags": [
+          "Payments"
+        ],
         "summary": "Api Payments Create",
         "operationId": "api_payments_create_api_v1_payments_post",
         "requestBody": {
@@ -113,30 +250,53 @@
           },
           "required": true
         },
-        "responses": { "201": { "description": "Created" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/payments/{payment_hash}": {
       "get": {
-        "tags": ["Payments"],
+        "tags": [
+          "Payments"
+        ],
         "summary": "Api Payment",
         "operationId": "api_payment_api_v1_payments__payment_hash__get",
         "parameters": [
           {
             "required": true,
-            "schema": { "type": "string", "title": "Payment Hash" },
+            "schema": {
+              "type": "string",
+              "title": "Payment Hash"
+            },
             "name": "payment_hash",
             "in": "path"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/api/v1/payments/decode": {
       "post": {
-        "tags": ["Payments"],
+        "tags": [
+          "Payments"
+        ],
         "summary": "Api Payments Decode",
         "operationId": "api_payments_decode_api_v1_payments_decode_post",
         "requestBody": {
@@ -145,36 +305,65 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "data": { "type": "string", "title": "Data" }
+                  "data": {
+                    "type": "string",
+                    "title": "Data"
+                  }
                 },
-                "required": ["data"]
+                "required": [
+                  "data"
+                ]
               }
             }
           },
           "required": true
         },
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/lnurlp/api/v1/links": {
       "get": {
-        "tags": ["lnurlp"],
+        "tags": [
+          "lnurlp"
+        ],
         "summary": "Api Links",
         "operationId": "api_links_lnurlp_api_v1_links_get",
         "parameters": [
           {
             "required": false,
-            "schema": { "type": "boolean", "title": "All Wallets", "default": false },
+            "schema": {
+              "type": "boolean",
+              "title": "All Wallets",
+              "default": false
+            },
             "name": "all_wallets",
             "in": "query"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       },
       "post": {
-        "tags": ["lnurlp"],
+        "tags": [
+          "lnurlp"
+        ],
         "summary": "Api Link Create",
         "operationId": "api_link_create_lnurlp_api_v1_links_post",
         "requestBody": {
@@ -187,34 +376,60 @@
           },
           "required": true
         },
-        "responses": { "201": { "description": "Created" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/lnurlp/api/v1/links/{link_id}": {
       "get": {
-        "tags": ["lnurlp"],
+        "tags": [
+          "lnurlp"
+        ],
         "summary": "Api Link",
         "operationId": "api_link_lnurlp_api_v1_links__link_id__get",
         "parameters": [
           {
             "required": true,
-            "schema": { "type": "string", "title": "Link Id" },
+            "schema": {
+              "type": "string",
+              "title": "Link Id"
+            },
             "name": "link_id",
             "in": "path"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       },
       "put": {
-        "tags": ["lnurlp"],
+        "tags": [
+          "lnurlp"
+        ],
         "summary": "Api Link Update",
         "operationId": "api_link_update_lnurlp_api_v1_links__link_id__put",
         "parameters": [
           {
             "required": true,
-            "schema": { "type": "string", "title": "Link Id" },
+            "schema": {
+              "type": "string",
+              "title": "Link Id"
+            },
             "name": "link_id",
             "in": "path"
           }
@@ -229,50 +444,96 @@
           },
           "required": true
         },
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       },
       "delete": {
-        "tags": ["lnurlp"],
+        "tags": [
+          "lnurlp"
+        ],
         "summary": "Api Link Delete",
         "operationId": "api_link_delete_lnurlp_api_v1_links__link_id__delete",
         "parameters": [
           {
             "required": true,
-            "schema": { "type": "string", "title": "Link Id" },
+            "schema": {
+              "type": "string",
+              "title": "Link Id"
+            },
             "name": "link_id",
             "in": "path"
           }
         ],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/lnurlp/": {
       "get": {
-        "tags": ["lnurlp"],
+        "tags": [
+          "lnurlp"
+        ],
         "summary": "Lnurlp Index",
         "operationId": "lnurlp_index_lnurlp__get",
-        "responses": { "200": { "description": "OK", "content": { "text/html": {} } } }
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/html": {}
+            }
+          }
+        }
       }
     },
     "/api/v1/health": {
       "get": {
-        "tags": ["Core"],
+        "tags": [
+          "Core"
+        ],
         "summary": "Health Check",
         "operationId": "health_api_v1_health_get",
         "parameters": [],
-        "responses": { "200": { "description": "OK" } }
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/nwcprovider/api/v1/connections": {
       "get": {
-        "tags": ["nwcprovider"],
+        "tags": [
+          "nwcprovider"
+        ],
         "summary": "Api Connections",
         "operationId": "api_connections_nwcprovider_api_v1_connections_get",
         "parameters": [],
-        "responses": { "200": { "description": "OK" } },
-        "security": [{ "APIKeyHeader": [] }]
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     }
   },
@@ -281,47 +542,109 @@
       "CreateInvoiceData": {
         "type": "object",
         "properties": {
-          "out": { "type": "boolean", "title": "Out", "default": false },
-          "amount": { "type": "integer", "title": "Amount" },
-          "memo": { "type": "string", "title": "Memo", "default": "" },
-          "unit": { "type": "string", "title": "Unit", "default": "sat" }
+          "out": {
+            "type": "boolean",
+            "title": "Out",
+            "default": false
+          },
+          "amount": {
+            "type": "integer",
+            "title": "Amount"
+          },
+          "memo": {
+            "type": "string",
+            "title": "Memo",
+            "default": ""
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "sat"
+          }
         },
-        "required": ["amount"]
+        "required": [
+          "amount"
+        ]
       },
       "CreatePayLinkData": {
         "type": "object",
         "properties": {
-          "description": { "type": "string", "title": "Description" },
-          "min": { "type": "integer", "title": "Min", "default": 1 },
-          "max": { "type": "integer", "title": "Max", "default": 1000000 },
-          "comment_chars": { "type": "integer", "title": "Comment Chars", "default": 0 }
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "min": {
+            "type": "integer",
+            "title": "Min",
+            "default": 1
+          },
+          "max": {
+            "type": "integer",
+            "title": "Max",
+            "default": 1000000
+          },
+          "comment_chars": {
+            "type": "integer",
+            "title": "Comment Chars",
+            "default": 0
+          }
         },
-        "required": ["description"]
+        "required": [
+          "description"
+        ]
       },
       "HTTPValidationError": {
         "type": "object",
         "properties": {
           "detail": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ValidationError" }
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
           }
         }
       },
       "ValidationError": {
         "type": "object",
         "properties": {
-          "loc": { "type": "array", "items": { "type": "string" } },
-          "msg": { "type": "string" },
-          "type": { "type": "string" }
+          "loc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "msg": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
         },
-        "required": ["loc", "msg", "type"]
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ]
       }
     },
     "securitySchemes": {
-      "APIKeyHeader": { "type": "apiKey", "in": "header", "name": "X-API-KEY" },
-      "APIKeyQuery": { "type": "apiKey", "in": "query", "name": "api_key" },
-      "HTTPBearer": { "type": "http", "scheme": "bearer" },
-      "OAuth2PasswordBearer": { "type": "oauth2" }
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-KEY"
+      },
+      "APIKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api_key"
+      },
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "OAuth2PasswordBearer": {
+        "type": "oauth2"
+      }
     }
   }
 }
