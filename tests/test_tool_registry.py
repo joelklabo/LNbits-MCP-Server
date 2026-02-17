@@ -452,6 +452,22 @@ class TestToolRegistry:
                 f"Tool '{tool.name}' has float numeric constraints: {issues}"
             )
 
+    def test_schemas_valid_json_schema_2020_12(self, operations):
+        """All tool schemas from the offline fixture must be valid JSON Schema 2020-12."""
+        from jsonschema import Draft202012Validator
+
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(operations)
+        tools = reg.get_mcp_tools()
+
+        for tool in tools:
+            try:
+                Draft202012Validator.check_schema(tool.inputSchema)
+            except Exception as e:
+                raise AssertionError(
+                    f"Tool '{tool.name}' has invalid JSON Schema 2020-12: {e}"
+                )
+
     def test_schema_without_type_gets_string_default(self):
         """Properties with only description (no type) must get type: string."""
         op = DiscoveredOperation(
