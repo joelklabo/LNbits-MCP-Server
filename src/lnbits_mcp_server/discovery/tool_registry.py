@@ -190,6 +190,13 @@ class ToolRegistry:
             original_type = result.pop("type")
             result["anyOf"] = [{"type": original_type}, {"type": "null"}]
 
+        # Ensure sub-schemas have type info (enum-only schemas need "type": "string")
+        if result and not any(
+            k in result for k in ("type", "anyOf", "oneOf", "allOf", "$ref")
+        ):
+            if "enum" in result or "description" in result:
+                result["type"] = "string"
+
         return result
 
     # ------------------------------------------------------------------
@@ -245,9 +252,12 @@ class ToolRegistry:
         if "description" not in prepared and "title" in prepared:
             prepared["description"] = prepared.pop("title")
         result = cls._sanitize_schema(prepared)
-        # Fallback: if no type info at all, default to string
-        if not result:
-            result = {"type": "string"}
+        # Ensure every property has a type (or anyOf/oneOf/allOf/enum)
+        has_type_info = any(
+            k in result for k in ("type", "anyOf", "oneOf", "allOf", "enum", "$ref")
+        )
+        if not has_type_info:
+            result["type"] = "string"
         return result
 
     # ------------------------------------------------------------------

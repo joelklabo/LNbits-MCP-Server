@@ -452,6 +452,92 @@ class TestToolRegistry:
                 f"Tool '{tool.name}' has float numeric constraints: {issues}"
             )
 
+    def test_schema_without_type_gets_string_default(self):
+        """Properties with only description (no type) must get type: string."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="GET",
+            path="/api/v1/payments/{payment_hash}",
+            summary="Get payment",
+            description="Get payment",
+            tag="payments",
+            parameters=[
+                {
+                    "name": "payment_hash",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"description": "Payment Hash"},
+                },
+            ],
+            request_body_schema=None,
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        prop = schema["properties"]["payment_hash"]
+        assert prop["type"] == "string"
+        assert prop["description"] == "Payment Hash"
+
+    def test_enum_without_type_gets_string_default(self):
+        """Enum-only schemas (from Pydantic) must get type: string."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="POST",
+            path="/api/v1/wallet",
+            summary="Create",
+            description="Create",
+            tag="wallet",
+            parameters=[],
+            request_body_schema={
+                "properties": {
+                    "status": {
+                        "enum": ["draft", "open", "paid"],
+                        "description": "An enumeration.",
+                    }
+                },
+                "required": [],
+            },
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        prop = schema["properties"]["status"]
+        assert prop["type"] == "string"
+        assert prop["enum"] == ["draft", "open", "paid"]
+
+    def test_items_enum_without_type_gets_string(self):
+        """Array items with only enum must get type: string."""
+        op = DiscoveredOperation(
+            tool_name="test_tool",
+            method="POST",
+            path="/api/v1/share",
+            summary="Share",
+            description="Share",
+            tag="wallet",
+            parameters=[],
+            request_body_schema={
+                "properties": {
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "enum": ["view", "send", "receive"],
+                            "description": "An enumeration.",
+                        },
+                    }
+                },
+                "required": [],
+            },
+            security_schemes=[],
+            is_public=False,
+            extension_name=None,
+        )
+        schema = ToolRegistry._build_input_schema(op)
+        items = schema["properties"]["permissions"]["items"]
+        assert items["type"] == "string"
+        assert items["enum"] == ["view", "send", "receive"]
+
     def test_title_to_description_fallback(self):
         """_extract_prop should convert title to description when no description."""
         schema = {"type": "string", "title": "My Title"}
@@ -471,3 +557,109 @@ class TestToolRegistry:
         schema = {"example": "foo", "deprecated": True}
         result = ToolRegistry._extract_prop(schema)
         assert result == {"type": "string"}
+
+
+class TestToolRegistryLiveSpec:
+    """Integration tests against the live lnbits.klabo.world OpenAPI spec."""
+
+    @pytest.fixture
+    def live_operations(self, live_openapi_spec):
+        parser = OpenAPIParser("https://lnbits.klabo.world")
+        return parser.parse_spec_dict(live_openapi_spec)
+
+    OPENAPI_ONLY_KEYWORDS = {
+        "nullable", "example", "examples", "deprecated", "readOnly",
+        "writeOnly", "discriminator", "xml", "externalDocs",
+    }
+
+    @classmethod
+    def _collect_keys_recursive(cls, obj, collected=None):
+        if collected is None:
+            collected = set()
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                collected.add(key)
+                cls._collect_keys_recursive(value, collected)
+        elif isinstance(obj, list):
+            for item in obj:
+                cls._collect_keys_recursive(item, collected)
+        return collected
+
+    def test_no_openapi_keywords_in_live_spec(self, live_operations):
+        """No OpenAPI-only keywords should leak through in live spec tools."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(live_operations)
+        tools = reg.get_mcp_tools()
+        assert len(tools) > 0
+
+        for tool in tools:
+            keys = self._collect_keys_recursive(tool.inputSchema)
+            leaked = keys & self.OPENAPI_ONLY_KEYWORDS
+            assert not leaked, (
+                f"Tool '{tool.name}' has OpenAPI-only keywords: {leaked}"
+            )
+
+    def test_all_properties_have_type_in_live_spec(self, live_operations):
+        """Every property schema must have type (or anyOf/oneOf/allOf)."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(live_operations)
+        tools = reg.get_mcp_tools()
+
+        def check_types(schema, path, issues):
+            if not isinstance(schema, dict):
+                return
+            # Check this schema has type info
+            has_type = any(
+                k in schema for k in ("type", "anyOf", "oneOf", "allOf", "$ref")
+            )
+            if not has_type and schema and path != "root":
+                issues.append(f"no type at {path}: {schema}")
+            # Recurse
+            for key, val in schema.items():
+                if key == "properties" and isinstance(val, dict):
+                    for pn, pv in val.items():
+                        check_types(pv, f"{path}.{pn}", issues)
+                elif key == "items" and isinstance(val, dict):
+                    check_types(val, f"{path}.items", issues)
+                elif key in ("anyOf", "oneOf", "allOf") and isinstance(val, list):
+                    for j, s in enumerate(val):
+                        if isinstance(s, dict):
+                            check_types(s, f"{path}.{key}[{j}]", issues)
+
+        for tool in tools:
+            issues = []
+            check_types(tool.inputSchema, "root", issues)
+            assert not issues, (
+                f"Tool '{tool.name}' has schemas without type: {issues}"
+            )
+
+    def test_no_float_constraints_in_live_spec(self, live_operations):
+        """No whole-number float constraints (like 1.0) in live spec tools."""
+        reg = ToolRegistry(RegistryConfig(exclude_methods=[]))
+        reg.load(live_operations)
+        tools = reg.get_mcp_tools()
+
+        numeric_keys = {"minimum", "maximum", "exclusiveMinimum",
+                        "exclusiveMaximum", "minItems", "maxItems",
+                        "minLength", "maxLength"}
+
+        def check(obj, path, issues):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k in numeric_keys and isinstance(v, float) and v == int(v):
+                        issues.append(f"{k}={v} at {path}.{k}")
+                    if k == "properties" and isinstance(v, dict):
+                        for pn, pv in v.items():
+                            check(pv, f"{path}.{pn}", issues)
+                    elif k == "items" and isinstance(v, dict):
+                        check(v, f"{path}.items", issues)
+                    elif k in ("anyOf", "oneOf", "allOf") and isinstance(v, list):
+                        for j, s in enumerate(v):
+                            check(s, f"{path}.{k}[{j}]", issues)
+
+        for tool in tools:
+            issues = []
+            check(tool.inputSchema, "root", issues)
+            assert not issues, (
+                f"Tool '{tool.name}' has whole-number float constraints: {issues}"
+            )
